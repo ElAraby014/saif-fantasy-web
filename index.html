@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>saif-Fantasy</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦁</text></svg>">
+    
+    <script src="dexie.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     WEB GATE — website-only login + license activation screen.
+     Sits above everything (including the splash screen) until a
+     valid license + credential pass, then hides. Populated/driven
+     entirely by js/18_web_gate.js.
+═══════════════════════════════════════════════════════════ -->
+<div id="web-gate-overlay">
+    <div class="wg-card">
+        <div class="wg-logo">🦁</div>
+        <h2 class="wg-title">Saif Fantasy</h2>
+
+        <div id="wg-step-license">
+            <h3 class="wg-subtitle">System Activation</h3>
+            <input type="text" id="wg-license-input" placeholder="Enter Activation Key" autocomplete="off" autocapitalize="characters">
+            <button id="wg-license-btn">Activate System</button>
+        </div>
+
+        <div id="wg-step-login" style="display:none;">
+            <h3 class="wg-subtitle">Sign In</h3>
+            <input type="password" id="wg-password-input" placeholder="Password" autocomplete="off">
+            <button id="wg-login-btn">Access System</button>
+        </div>
+
+        <div id="wg-error" class="wg-error" style="display:none;"></div>
+    </div>
+</div>
+
+<div class="app-container">
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SPLASH SCREEN — shown on cold open, dismissed after data loads
+    ═══════════════════════════════════════════════════════════ -->
+    <div id="splash-screen">
+        <div class="splash-bg-glow splash-glow-1"></div>
+        <div class="splash-bg-glow splash-glow-2"></div>
+
+        <div class="splash-logo-wrap">
+            <div class="splash-lion">🦁</div>
+            <div class="splash-rings">
+                <div class="splash-ring splash-ring-1"></div>
+                <div class="splash-ring splash-ring-2"></div>
+                <div class="splash-ring splash-ring-3"></div>
+            </div>
+        </div>
+
+        <div class="splash-text-wrap">
+            <div class="splash-title">Saif Fantasy</div>
+            <div class="splash-subtitle">Gaming Center</div>
+        </div>
+
+        <div class="splash-loader-wrap">
+            <div class="splash-loader-track">
+                <div class="splash-loader-bar" id="splash-loader-bar"></div>
+            </div>
+            <div class="splash-loader-label" id="splash-loader-label">Initializing…</div>
+        </div>
+
+        <div class="splash-footer">Powered by Saif El Araby</div>
+    </div>
+
+    <div id="main-app" style="display: none;">
+        
+        <div class="top-header">
+            <div class="header-left">
+                <button id="menu-icon-btn" onclick="toggleAdminMenu(true)" style="position:relative; background:transparent; border:none; color:var(--accent-cyan); font-size:28px; padding:0; display:none; width:auto;">☰<span class="pending-dot" id="pending-dot-menu-icon" style="display:none;"></span></button>
+                <div class="user-info">
+                    <span id="lbl-session">Session</span>
+                    <span id="current-user-display"></span>
+                </div>
+                <button id="lang-toggle-btn" onclick="toggleLanguage()" title="Toggle Arabic / English" style="background:transparent;border:none;color:var(--accent-cyan);font-size:22px;padding:4px 6px;width:auto;line-height:1;cursor:pointer;flex-shrink:0;">🌐</button>
+                <button id="notebook-icon-btn" onclick="openNotebookPanel()" title="Notebook" style="position:relative;background:transparent;border:none;color:var(--accent-cyan);font-size:22px;padding:4px 6px;width:auto;line-height:1;cursor:pointer;flex-shrink:0;">
+                    📓
+                    <span class="notebook-dot" id="notebook-dot-main" style="display:none;"></span>
+                </button>
+                <span id="sync-status-icon" title="" style="display:none;background:transparent;border:none;color:var(--accent-cyan);font-size:20px;padding:4px 2px;line-height:1;flex-shrink:0;">●</span>
+                <span id="sync-device-count" style="display:none;background:rgba(255,255,255,0.08);color:var(--text-muted);font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;line-height:1.4;flex-shrink:0;"></span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="logout-btn" onclick="logout()" style="width: auto;" id="lbl-logout">Logout</button>
+            </div>
+        </div>
+
+        <div id="lounge-view" class="view-content">
+            <div class="zone-selector">
+                <button class="zone-btn" id="zone-vip" onclick="switchZone('vip')">👑 VIP</button>
+                <button class="zone-btn active" id="zone-lounge" onclick="switchZone('lounge')">🎮 Lounge</button>
+                <button class="zone-btn" id="zone-cafe" onclick="switchZone('cafe')">☕ Cafe Tables</button>
+                <button class="zone-btn" id="zone-shared" onclick="switchZone('shared')">👥 Shared Space</button>
+            </div>
+
+            <div id="price-bar-container" >
+                <span id="lounge-rate-single">Single: <strong id="display-rate-single" style="color:#fff;">70</strong></span>
+                <span id="lounge-rate-multi">Multi: <strong id="display-rate-multi" style="color:#fff;">100</strong></span>
+                <span id="lounge-rate-iptv">IPTV: <strong id="display-rate-iptv" style="color:#fff;">100</strong></span>
+                <span id="lounge-rate-ps5" style="color: var(--accent-purple); font-weight: bold; margin-left: 5px;">(+ 25/hr for PS5)</span>
+                <span id="vip-rate-ps4" style="display:none;">PS4 Gaming: <strong id="display-rate-vip-ps4" style="color:#fff;">120</strong></span>
+                <span id="vip-rate-ps5" style="display:none;">PS5 Gaming: <strong id="display-rate-vip-ps5" style="color:#fff;">150</strong></span>
+                <span id="vip-rate-iptv" style="display:none;">VIP IPTV: <strong id="display-rate-vip-iptv" style="color:#fff;">125</strong></span>
+                <span id="shared-rate-display" style="display:none;">Shared Space: <strong id="display-rate-shared" style="color:#fff;">25</strong>/hr</span>
+            </div>
+
+            <div class="console-grid" id="console-grid-container"></div>
+        </div>
+
+        <div id="noroom-view" class="view-content" style="display: none;">
+            <h2>No Room Ask</h2>
+            <div class="admin-section" style="margin-bottom: 15px;">
+                <p style="color: var(--text-muted); font-size: 13px; margin-top: 0;">Log games requested by walk-in customers who didn't play.</p>
+                <div id="noroom-games-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" class="noroom-game-input" placeholder="Enter game name (e.g., FIFA 24)">
+                </div>
+                <button class="btn-blue" onclick="addGameInput('noroom-games-container', 'noroom-game-input')" style="margin-bottom: 15px; background: transparent; border: 1px dashed #3b82f6; color: #3b82f6;">+ Add another game</button>
+                <button class="btn-success" onclick="submitNoRoomGames()">Log Walk-in Request</button>
+            </div>
+        </div>
+
+        <div id="financial-view" class="view-content" style="display: none;">
+            <h2>Financial Tracker</h2>
+            <div class="summary-cards" id="finance-summary">
+                <div class="card">
+                    <h3>NET PROFIT</h3>
+                    <div class="amount" id="sum-profit">0.00 EGP</div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="card" style="flex: 1; flex-direction: column; align-items: flex-start;">
+                        <h3>INCOME</h3>
+                        <div class="amount profit-positive" id="sum-income" style="font-size: 16px;">0.00 EGP</div>
+                    </div>
+                    <div class="card" style="flex: 1; flex-direction: column; align-items: flex-start;">
+                        <h3>EXPENSES</h3>
+                        <div class="amount profit-negative" id="sum-expense" style="font-size: 16px;">0.00 EGP</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <label for="entry-expense">Add Expense (EGP)</label>
+                <input type="number" id="entry-expense" placeholder="0.00" min="0">
+                <label for="entry-expense-comment">Description</label>
+                <input type="text" id="entry-expense-comment" placeholder="e.g. Supplies">
+                <button onclick="addManualExpense()">Log Expense</button>
+                <button onclick="openFinancePendingModal()" style="position:relative; background:transparent; border:1px dashed var(--border-color); color:var(--text-main); margin-top:6px;">
+                    🔒 <span id="pc-finance-btn-label-el">Pending Checkouts</span>
+                    <span class="pending-dot" id="pending-dot-finance-btn" style="display:none;"></span>
+                </button>
+            </div>
+
+            <!-- Admin-only: Day/Month/Total grouping filter for the ledger below.
+                 Visibility toggled in JS (updateFinanceUI(), 10_finance.js) based on
+                 sessionStorage's gaming_role — hidden entirely for non-admin roles. -->
+            <div id="finance-filter-toggle" style="display:none; gap:8px; margin-bottom:12px;">
+                <button class="stock-tab-btn active" id="finance-filter-day" onclick="setFinanceFilterMode('day')">Day</button>
+                <button class="stock-tab-btn" id="finance-filter-month" onclick="setFinanceFilterMode('month')">Month</button>
+                <button class="stock-tab-btn" id="finance-filter-total" onclick="setFinanceFilterMode('total')">Total</button>
+            </div>
+
+            <div class="table-container" id="finance-table">
+                <table>
+                    <tbody id="records-body"></tbody>
+                </table>
+            </div>
+
+            <!-- Non-admin view: current business-day (04:00 reset) summary + today's
+                 transactions only. Populated by renderTodayFinanceView() (10_finance.js).
+                 Hidden entirely for admin, who sees finance-filter-toggle + finance-table instead. -->
+            <div id="finance-today-view" style="display:none;"></div>
+        </div>
+
+        <div id="audits-view" class="view-content" style="display: none;">
+            <button onclick="closeAuditsView()" style="background: transparent; border: 1px solid var(--border-color); color: white; width: auto; margin-bottom: 15px; padding: 8px 15px;">⬅ Back to Lounge</button>
+            <h2>Audits & Pricing</h2>
+
+            <!-- TAB SWITCHER -->
+            <div id="audits-tab-bar" style="display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;">
+                <button class="stock-tab-btn active" id="atab-lounge" onclick="switchAuditsTab('lounge')">Lounge</button>
+                <button class="stock-tab-btn"        id="atab-vip"    onclick="switchAuditsTab('vip')">VIP</button>
+                <button class="stock-tab-btn"        id="atab-shared" onclick="switchAuditsTab('shared')">Shared Area</button>
+                <button class="stock-tab-btn"        id="atab-menu"   onclick="switchAuditsTab('menu')">Drinks Menu</button>
+            </div>
+
+            <!-- LOUNGE TAB -->
+            <div id="audits-panel-lounge">
+                <div class="admin-section">
+                    <h3 id="h3-audits-lounge">🎮 Console Pricing</h3>
+                    <label id="lbl-audits-single" for="config-single">Single (EGP/hr):</label>
+                    <input type="number" id="config-single" placeholder="70">
+                    <label id="lbl-audits-multi" for="config-multi">Multi (EGP/hr):</label>
+                    <input type="number" id="config-multi" placeholder="100">
+                    <label id="lbl-audits-iptv" for="config-iptv">Lounge IPTV (EGP/hr):</label>
+                    <input type="number" id="config-iptv" placeholder="100">
+                    <label id="lbl-audits-ps5-extra" for="config-ps5-extra">PS5 Extra (EGP/hr):</label>
+                    <input type="number" id="config-ps5-extra" placeholder="25">
+
+                    <button id="btn-save-audits-lounge" onclick="saveAuditsConfig()" style="background: var(--accent-cyan); color: #000; margin-top: 10px;">Save Pricing</button>
+                </div>
+            </div>
+
+            <!-- VIP TAB -->
+            <div id="audits-panel-vip" style="display:none;">
+                <div class="admin-section">
+                    <h3 id="h3-audits-vip">👑 VIP Pricing</h3>
+                    <label id="lbl-audits-vip-ps4" for="config-vip-ps4">VIP PS4 Gaming (EGP/hr):</label>
+                    <input type="number" id="config-vip-ps4" placeholder="120">
+                    <label id="lbl-audits-vip-ps5" for="config-vip-ps5">VIP PS5 Gaming (EGP/hr):</label>
+                    <input type="number" id="config-vip-ps5" placeholder="150">
+                    <label id="lbl-audits-vip-iptv" for="config-vip-iptv">VIP IPTV (EGP/hr):</label>
+                    <input type="number" id="config-vip-iptv" placeholder="125">
+
+                    <button id="btn-save-audits-vip" onclick="saveAuditsConfig()" style="background: var(--accent-cyan); color: #000; margin-top: 10px;">Save Pricing</button>
+                </div>
+            </div>
+
+            <!-- SHARED AREA TAB -->
+            <div id="audits-panel-shared" style="display:none;">
+                <div class="admin-section">
+                    <h3 id="h3-audits-shared">🛋️ Shared Area Pricing</h3>
+                    <label id="lbl-audits-shared" for="config-shared">Shared Space (EGP/hr):</label>
+                    <input type="number" id="config-shared" placeholder="25">
+
+                    <button id="btn-save-audits-shared" onclick="saveAuditsConfig()" style="background: var(--accent-cyan); color: #000; margin-top: 10px;">Save Pricing</button>
+                </div>
+            </div>
+
+            <!-- DRINKS MENU TAB -->
+            <div id="audits-panel-menu" style="display:none;">
+                <div class="admin-section">
+                    <h3 id="h3-audits-menu">🥤 Drinks Menu</h3>
+                    <p id="p-audits-menu-desc" style="color: var(--text-muted); font-size: 12px; margin-top: 0;">Update prices or add new items.</p>
+                    <div id="drinks-admin-list"></div>
+                    <hr style="border-top: 1px dashed var(--border-color); margin: 20px 0; border-bottom: none;">
+                    <h4 id="h4-audits-add-item" style="margin-top:0; margin-bottom:10px;">Add New Menu Item</h4>
+                    <input type="text" id="new-drink-name" placeholder="Display Name (e.g. Redbull)">
+                    <input type="number" id="new-drink-price" placeholder="Price (EGP)">
+                    <button id="btn-audits-add-item" onclick="addNewDrink()" class="btn-success">Add Item</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="expenses-admin-view" class="view-content" style="display: none;">
+            <button onclick="switchTab('lounge')" style="background: transparent; border: 1px solid var(--border-color); color: white; width: auto; margin-bottom: 15px; padding: 8px 15px;">⬅ Back to Lounge</button>
+            <h2>Modify Expenses</h2>
+
+            <!-- TAB SWITCHER -->
+            <div id="expenses-tab-bar" style="display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;">
+                <button class="stock-tab-btn active" id="xtab-edit" onclick="switchExpensesTab('edit')">Edit Expenses</button>
+                <button class="stock-tab-btn"        id="xtab-log"  onclick="switchExpensesTab('log')">Edit History Log</button>
+            </div>
+
+            <!-- EDIT EXPENSES TAB -->
+            <div id="expenses-panel-edit">
+                <div class="admin-section">
+                    <p id="p-expenses-edit-desc" style="color: var(--text-muted); font-size: 12px; margin-top: 0;">View and edit previously logged expenses.</p>
+                    <div id="expenses-admin-list" style="max-height: 60vh; overflow-y: auto; padding-right: 5px;"></div>
+                </div>
+            </div>
+
+            <!-- EDIT HISTORY LOG TAB -->
+            <div id="expenses-panel-log" style="display:none;">
+                <div class="admin-section">
+                    <p id="p-expenses-log-desc" style="color: var(--text-muted); font-size: 12px; margin-top: 0;">History of edits made to expense records.</p>
+                    <div id="expense-edit-log-list" style="max-height: 60vh; overflow-y: auto; padding-right: 5px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="admin-games-view" class="view-content" style="display: none;">
+            <button onclick="switchTab('lounge')" style="background: transparent; border: 1px solid var(--border-color); color: white; width: auto; margin-bottom: 15px; padding: 8px 15px;">⬅ Back to Lounge</button>
+            <button class="btn btn-primary" onclick="exportClientsDataToCSV()">Export Clients Data</button>
+            <h2>Games Asked For</h2>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 0;">History of all games requested (Sessions & Walk-ins).</p>
+            <div class="table-container">
+                <table>
+                    <tbody id="games-records-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════
+             STOCK MANAGEMENT VIEW
+        ══════════════════════════════════════════ -->
+        <div id="stock-view" class="view-content" style="display: none;">
+            <button onclick="switchTab('lounge')" style="background: transparent; border: 1px solid var(--border-color); color: white; width: auto; margin-bottom: 16px; padding: 9px 16px;">⬅ Back to Lounge</button>
+            <h2>📦 Stock Management</h2>
+
+            <!-- TAB SWITCHER -->
+            <div id="stock-tab-bar" style="display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;">
+                <button class="stock-tab-btn active" id="stab-overview"   onclick="switchStockTab('overview')">Overview</button>
+                <button class="stock-tab-btn"        id="stab-purchase"   onclick="switchStockTab('purchase')">Purchase</button>
+                <button class="stock-tab-btn"        id="stab-traceable"  onclick="switchStockTab('traceable')">Traceable</button>
+                <button class="stock-tab-btn"        id="stab-components" onclick="switchStockTab('components')">Components</button>
+                <button class="stock-tab-btn"        id="stab-adjust"     onclick="switchStockTab('adjust')">Adjust</button>
+            </div>
+
+            <!-- OVERVIEW TAB -->
+            <div id="stock-panel-overview">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0; color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">Current Stock Levels</h3>
+                    <button onclick="exportStockCSV()" style="width:auto; padding:8px 14px; font-size:12px; background:transparent; border:1px solid var(--accent-cyan); color:var(--accent-cyan); border-radius:8px;">⬇ Export CSV</button>
+                </div>
+                <div id="stock-overview-list"></div>
+            </div>
+
+            <!-- PURCHASE TAB -->
+            <div id="stock-panel-purchase" style="display:none;">
+                <div class="admin-section" style="margin-bottom:14px;">
+                    <h3>Log a Purchase</h3>
+                    <p style="color:var(--text-muted); font-size:12px; margin-top:0; margin-bottom:14px;">Select a menu item or a component, enter quantity and total cost. An expense is logged automatically.</p>
+                    <label>Item</label>
+                    <select id="purchase-item-select"><option value="">— Select Item —</option></select>
+                    <label id="purchase-qty-label">Quantity (pieces)</label>
+                    <input type="number" id="purchase-qty" placeholder="e.g. 24" min="1">
+                    <label>Total Cost Paid (EGP)</label>
+                    <input type="number" id="purchase-cost" placeholder="e.g. 120.00" min="0" step="0.01">
+                    <label>Notes (optional)</label>
+                    <input type="text" id="purchase-notes" placeholder="e.g. Supplier: Ahmed">
+                    <button class="btn-success" onclick="logPurchase()" style="margin-top:4px;">✅ Log Purchase &amp; Expense</button>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0; color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">Purchase History</h3>
+                    <button onclick="exportPurchasesCSV()" style="width:auto; padding:8px 14px; font-size:12px; background:transparent; border:1px solid var(--accent-cyan); color:var(--accent-cyan); border-radius:8px;">⬇ Export CSV</button>
+                </div>
+                <div id="purchase-history-list"></div>
+            </div>
+
+            <!-- TRACEABLE TAB -->
+            <div id="stock-panel-traceable" style="display:none;">
+                <div class="admin-section" style="margin-bottom:14px;">
+                    <h3>Traceable Items</h3>
+                    <p style="color:var(--text-muted); font-size:12px; margin-top:0; margin-bottom:0;">Toggle which items are tracked in stock. Non-traceable items (e.g. Tea, Turkey Coffee) will never deduct from stock when sold.</p>
+                </div>
+                <div id="traceable-items-list"></div>
+            </div>
+
+            <!-- COMPONENTS TAB -->
+            <div id="stock-panel-components" style="display:none;">
+                <div class="admin-section" style="margin-bottom:14px;">
+                    <h3 id="h3-components">🧪 Stock Components</h3>
+                    <p id="components-desc" style="color:var(--text-muted); font-size:12px; margin-top:0; margin-bottom:14px;">Raw ingredients or extras (e.g. Mint Syrup) that you purchase and track in stock, but that never appear on the customer menu by themselves. Link them to a drink's recipe from <strong style="color:var(--accent-cyan);">Drinks Management</strong> so selling that drink automatically deducts the right components.</p>
+                    <label id="lbl-component-name">Component Name</label>
+                    <input type="text" id="new-component-name" placeholder="e.g. Mint Syrup">
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:8px; margin-bottom:14px;">
+                        <input type="checkbox" id="new-component-traceable" checked style="width:auto; margin:0;">
+                        <span id="lbl-component-traceable" style="font-size:13px; color:var(--text-muted);">Track stock for this component</span>
+                    </label>
+                    <button class="btn-success" id="btn-add-component" onclick="addNewComponent()">+ Add Component</button>
+                </div>
+                <h3 id="h3-existing-components" style="margin:0 0 12px; color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">Existing Components</h3>
+                <div id="components-list"></div>
+            </div>
+
+            <!-- ADJUST TAB -->
+            <div id="stock-panel-adjust" style="display:none;">
+                <div class="admin-section" style="margin-bottom:14px;">
+                    <h3>Manual Stock Adjustment</h3>
+                    <p style="color:var(--text-muted); font-size:12px; margin-top:0; margin-bottom:14px;">Log missing or damaged stock. No financial expense is created — only stock is deducted.</p>
+                    <label>Item</label>
+                    <select id="adjust-item-select"><option value="">— Select Traceable Item —</option></select>
+                    <div id="adjust-current-stock" style="font-size:13px; color:var(--text-muted); margin-bottom:10px; min-height:18px;"></div>
+                    <label>Quantity to Deduct (pieces)</label>
+                    <input type="number" id="adjust-qty" placeholder="e.g. 3" min="1">
+                    <label>Reason</label>
+                    <input type="text" id="adjust-reason" placeholder="e.g. Damaged, Missing, Counted short">
+                    <button class="btn-danger" onclick="logAdjustment()" style="margin-top:4px;">⚠️ Log Adjustment</button>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0; color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">Adjustment History</h3>
+                    <button onclick="exportAdjustmentsCSV()" style="width:auto; padding:8px 14px; font-size:12px; background:transparent; border:1px solid var(--accent-cyan); color:var(--accent-cyan); border-radius:8px;">⬇ Export CSV</button>
+                </div>
+                <div id="adjust-history-list"></div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════
+             EMPLOYEE & PERSONAL USE VIEW
+        ══════════════════════════════════════════ -->
+        <div id="employee-view" class="view-content" style="display: none;">
+            <button onclick="switchTab('lounge')" style="background: transparent; border: 1px solid var(--border-color); color: white; width: auto; margin-bottom: 16px; padding: 9px 16px;">⬅ Back to Lounge</button>
+            <h2>👥 Employees & Personal Use</h2>
+
+            <!-- TAB BAR -->
+            <div id="emp-tab-bar" style="margin-bottom:18px;">
+                <button class="stock-tab-btn active" id="etab-employees" onclick="switchEmpTab('employees')">Employees</button>
+                <button class="stock-tab-btn" id="etab-personaluse" onclick="switchEmpTab('personaluse')">Personal Use Log</button>
+                <button class="stock-tab-btn" id="etab-loginhistory" onclick="switchEmpTab('loginhistory')">Login History</button>
+            </div>
+
+            <!-- EMPLOYEES TAB -->
+            <div id="emp-panel-employees">
+                <div class="admin-section" style="margin-bottom:14px;">
+                    <h3>Add Employee</h3>
+                    <label>Name</label>
+                    <input type="text" id="emp-add-name" placeholder="e.g. Ahmed">
+                    <label>Monthly Salary (EGP)</label>
+                    <input type="number" id="emp-add-salary" placeholder="e.g. 3000" min="0">
+                    <button class="btn-success" onclick="addEmployee()" style="margin-top:4px;">➕ Add Employee</button>
+                </div>
+
+                <!-- FINALIZE MONTH BUTTON -->
+                <div class="admin-section" style="margin-bottom:14px; border-color: rgba(245,166,35,0.25);">
+                    <h3 style="color: var(--warning);">📅 Month-End Payroll</h3>
+                    <p style="color: var(--text-muted); font-size: 12px; margin-top: 0; margin-bottom: 12px;">Pay out all employees for the current month. Salary expenses are logged automatically and monthly deductions are reset to zero.</p>
+                    <button class="btn-warning" onclick="openFinalizeMonthModal()" style="font-weight:700; letter-spacing:0.3px;">📅 Finalize Month</button>
+                </div>
+
+                <div style="font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px;">Current Employees</div>
+                <div id="emp-list"></div>
+            </div>
+
+            <!-- PERSONAL USE TAB -->
+            <div id="emp-panel-personaluse" style="display:none;">
+                <div class="admin-section" style="margin-bottom:14px;">
+                    <h3>Log Personal Use / Salary Advance</h3>
+
+                    <label>Employee</label>
+                    <select id="puse-emp-select"><option value="">— Select Employee —</option></select>
+
+                    <label>Type</label>
+                    <select id="puse-type" onchange="togglePuseType()">
+                        <option value="item">Item Consumed</option>
+                        <option value="advance">Salary Advance (Cash)</option>
+                    </select>
+
+                    <!-- Item fields -->
+                    <div id="puse-item-fields">
+                        <label>Menu Item</label>
+                        <select id="puse-item-select" onchange="updatePuseCharge()"><option value="">— Select Item —</option></select>
+                        <div id="puse-charge-preview" style="font-size:13px; color:var(--text-muted); margin-bottom:10px; min-height:18px;"></div>
+                        <label>Charge Mode</label>
+                        <select id="puse-charge-mode" onchange="updatePuseCharge()">
+                            <option value="half">50% of menu price (default)</option>
+                            <option value="full">Full menu price</option>
+                            <option value="free">Free (no charge)</option>
+                            <option value="custom">Custom amount</option>
+                        </select>
+                        <div id="puse-custom-amount-row" style="display:none;">
+                            <label>Custom Charge (EGP)</label>
+                            <input type="number" id="puse-custom-amount" placeholder="e.g. 10" min="0" oninput="updatePuseCharge()">
+                        </div>
+                        <label>Quantity</label>
+                        <input type="number" id="puse-qty" placeholder="1" min="1" value="1" oninput="updatePuseCharge()">
+                    </div>
+
+                    <!-- Advance fields -->
+                    <div id="puse-advance-fields" style="display:none;">
+                        <label>Amount Taken (EGP)</label>
+                        <input type="number" id="puse-advance-amount" placeholder="e.g. 100" min="1">
+                        <label>Note (optional)</label>
+                        <input type="text" id="puse-advance-note" placeholder="e.g. Emergency">
+                    </div>
+
+                    <div id="puse-total-preview" style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:12px; display:none;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="color:var(--text-muted); font-size:13px;">Will deduct from salary:</span>
+                            <strong id="puse-total-display" style="color:var(--warning); font-size:16px;">0 EGP</strong>
+                        </div>
+                    </div>
+
+                    <button class="btn-warning" onclick="logPersonalUse()" style="margin-top:4px;">📋 Log Entry</button>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div style="font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.6px;">History</div>
+                    <select id="puse-filter-emp" onchange="renderPersonalUseLog()" style="width:auto; padding:6px 10px; font-size:12px; margin:0;">
+                        <option value="">All Employees</option>
+                    </select>
+                </div>
+                <div id="puse-history-list"></div>
+            </div>
+
+            <!-- LOGIN HISTORY TAB -->
+            <div id="emp-panel-loginhistory" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px;">
+                    <div id="lbl-login-activity" style="font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.6px;">Login / Logout Activity</div>
+                    <select id="login-history-filter" onchange="renderLoginHistory()" style="width:auto; padding:6px 10px; font-size:12px; margin:0;">
+                        <option value="">All Users</option>
+                    </select>
+                </div>
+                <div id="login-history-list"></div>
+                <button id="btn-clear-login-history" onclick="clearLoginHistory()" style="background:transparent; border:1px solid var(--border-color); color:var(--text-muted); width:auto; padding:8px 14px; font-size:12px; border-radius:8px; margin-top:12px;">🗑 Clear History</button>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             NOTEBOOK ADMIN VIEW — content rendered by 15_notebook.js
+        ═══════════════════════════════════════════════════════════ -->
+        <div id="notebook-admin-view" class="view-content" style="display: none;">
+            <button onclick="switchTab('lounge')" style="background: transparent; border: 1px solid var(--border-color); color: white; width: auto; margin-bottom: 16px; padding: 9px 16px;" id="btn-back-notebook">⬅ Back to Lounge</button>
+            <h2 id="notebook-admin-title-el">📓 Notebook Admin</h2>
+
+            <div class="admin-section" style="margin-bottom:14px;">
+                <h3 id="notebook-directory-title-el">👤 Notebook User Directory</h3>
+                <p id="notebook-directory-desc-el" style="color:var(--text-muted); font-size:12px; margin-top:0; margin-bottom:12px;">Controls the @mention list and read/unread rules. Does not grant app login.</p>
+                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <input type="text" id="notebook-new-user-name" placeholder="Name" style="margin:0; flex:2;">
+                    <select id="notebook-new-user-role" style="margin:0; flex:1;">
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <button class="btn-success" id="notebook-directory-add-btn" onclick="addNotebookUser()">+ Add User</button>
+                <div id="notebook-directory-list" style="margin-top:14px;"></div>
+            </div>
+
+            <div class="admin-section" style="margin-bottom:14px;">
+                <p id="notebook-admin-desc-el" style="color:var(--text-muted); font-size:12px; margin-top:0; margin-bottom:12px;">Every note, visible here regardless of who has read it.</p>
+                <div id="notebook-admin-notes-list"></div>
+            </div>
+        </div>
+
+        <div id="pending-admin-view" class="view-content" style="display: none;">
+            <button onclick="switchTab('lounge')" style="background: transparent; border: 1px solid var(--border-color); color: white; width: auto; margin-bottom: 16px; padding: 9px 16px;" id="btn-back-pending">⬅ <span id="pc-back-label-el">Back to Lounge</span></button>
+            <h2 id="pc-admin-title-el">🔒 Pending Checkouts</h2>
+
+            <!-- TAB SWITCHER -->
+            <div id="pending-tab-bar" style="display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;">
+                <button class="stock-tab-btn active" id="pctab-active" onclick="switchPendingTab('active')">Pending Checkouts</button>
+                <button class="stock-tab-btn"        id="pctab-log"    onclick="switchPendingTab('log')">History Log</button>
+            </div>
+
+            <!-- PENDING CHECKOUTS TAB -->
+            <div id="pending-panel-active">
+                <p id="pc-admin-desc-el" style="color:var(--text-muted); font-size:12px; margin-top:0; margin-bottom:14px;">Sessions/tables locked for later checkout. Resolving requires the password used at login.</p>
+                <div id="pc-admin-list"></div>
+            </div>
+
+            <!-- HISTORY LOG TAB -->
+            <div id="pending-panel-log" style="display:none;">
+                <p id="pc-log-desc-el" style="color:var(--text-muted); font-size:12px; margin-top:0; margin-bottom:14px;">History of resolved pending checkouts — how each was resolved, by whom, and when.</p>
+                <div id="pc-history-log-list" style="max-height: 60vh; overflow-y: auto; padding-right: 5px;"></div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             NOTEBOOK PANEL — 80% overlay, WhatsApp-style thread
+             Content rendered by 15_notebook.js
+        ═══════════════════════════════════════════════════════════ -->
+        <div id="notebook-panel-overlay" class="notebook-panel-overlay" onclick="if(event.target===this) closeNotebookPanel();">
+            <div class="notebook-panel">
+                <div class="notebook-panel-header">
+                    <span id="notebook-panel-title-el">📓 Notebook</span>
+                    <button onclick="closeNotebookPanel()" class="notebook-panel-close">×</button>
+                </div>
+                <div class="notebook-panel-pinned" id="notebook-pinned-list"></div>
+                <div class="notebook-panel-messages" id="notebook-messages-list"></div>
+                <div class="notebook-panel-composer">
+                    <div id="notebook-mention-chip" class="notebook-mention-chip" style="display:none;"></div>
+                    <div class="notebook-composer-row">
+                        <button class="notebook-mention-btn" id="notebook-mention-btn" onclick="toggleMentionPicker()">@</button>
+                        <input type="text" id="notebook-composer-input" placeholder="Write a note…" onkeydown="if(event.key==='Enter') sendNotebookMessage();">
+                        <button class="notebook-send-btn" onclick="sendNotebookMessage()">➤</button>
+                    </div>
+                    <div id="notebook-mention-picker" class="notebook-mention-picker" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-nav">
+            <button class="nav-btn active" id="btn-lounge" onclick="switchTab('lounge')">
+                <span style="font-size: 22px;">🎮</span>
+                Lounge
+            </button>
+            <button class="nav-btn" id="btn-noroom" onclick="switchTab('noroom')">
+                <span style="font-size: 22px;">🚫</span>
+                No Room Ask
+            </button>
+            <button class="nav-btn" id="btn-finance" onclick="switchTab('finance')">
+                <span style="font-size: 22px;">💰</span>
+                Finance
+            </button>
+        </div>
+    </div>
+    
+    <div class="modal-overlay" id="alert-modal">
+        <div class="modal-content" style="text-align: center;">
+            <h3 id="alert-title" style="margin-top: 0; color: var(--accent-cyan);">Notification</h3>
+            <p id="alert-message" style="margin: 15px 0; font-size: 15px; color: var(--text-muted);"></p>
+            <button onclick="closeAlert()">OK</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal-content" style="text-align: center;">
+            <h3 id="confirm-title" style="color: var(--warning); margin-top: 0;">Confirm Action</h3>
+            <p id="confirm-message" style="margin: 15px 0; font-size: 15px; color: var(--text-muted);"></p>
+            <div class="modal-actions">
+                <button class="btn-success" id="confirm-yes">Yes</button>
+                <button class="btn-danger" id="confirm-no">No</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="finance-pending-modal">
+        <div class="modal-content" style="max-width: 480px;">
+            <h3 style="margin-top: 0; color: var(--accent-cyan); margin-bottom: 5px;" id="pc-finance-modal-title-el">🔒 Pending Checkouts</h3>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 0; margin-bottom: 16px;" id="pc-finance-modal-desc-el">Locked receipts awaiting checkout. Requires the password used at login.</p>
+            <div id="pc-finance-list" style="max-height: 55vh; overflow-y: auto;"></div>
+            <div class="modal-actions" style="margin-top: 16px;">
+                <button style="background: transparent; border: 1px solid var(--border-color); color: white;" onclick="closeFinancePendingModal()" id="pc-finance-modal-close-el">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         RECORD RECEIPT + NOTES — generic popup for a Finance ledger
+         record OR a Pending Checkout record. Populated by
+         10_finance.js's openRecordReceipt()/_rrRenderReceiptBox()/
+         _rrRenderNotesList(). Closes on outside-tap (checks
+         event.target === this, so taps inside .modal-content don't
+         bubble up and close it) or the ✕ button — the only modal in
+         this app with outside-tap-to-close, since every other modal
+         either confirms a destructive action or holds in-progress form
+         input that shouldn't be lost to an accidental tap.
+    ═══════════════════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="record-receipt-modal" onclick="if (event.target === this) closeRecordReceipt()">
+        <div class="modal-content" style="max-width: 420px; position: relative;">
+            <button class="rr-close-btn" onclick="closeRecordReceipt()" aria-label="Close">×</button>
+            <h3 style="margin-top: 0; color: var(--accent-cyan); margin-bottom: 14px;">Record Details</h3>
+
+            <div class="pc-receipt-box" id="rr-receipt-box" style="margin-bottom: 18px;"></div>
+
+            <h4 style="margin: 0 0 10px; font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Notes</h4>
+            <div id="rr-notes-list" style="max-height: 30vh; overflow-y: auto; margin-bottom: 12px;"></div>
+
+            <div class="rr-note-input-row">
+                <textarea id="rr-note-input" placeholder="Add a note — sent to everyone in the Notebook…" rows="2"></textarea>
+                <button onclick="submitRecordNote()" style="width: auto; padding: 0 16px;">📝 Add</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="migrate-modal">
+        <div class="modal-content">
+            <h3 style="margin-top: 0; color: var(--accent-cyan); margin-bottom: 5px;">Migrate Table Charges</h3>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 0; margin-bottom: 20px;">Move all drinks and extras to a PS session.</p>
+            <label style="color: var(--text-muted); font-size: 13px; display: block; margin-bottom: 5px;">Target PS Console:</label>
+            <select id="migrate-target" style="margin-bottom: 20px;">
+            </select>
+            <div class="modal-actions" style="margin-top: 0;">
+                <button class="btn-warning" onclick="confirmMigration()">Migrate Charges Now</button>
+                <button style="background: transparent; border: 1px solid var(--border-color); color: white;" onclick="closeMigrateModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="drinks-modal">
+        <div class="modal-content">
+            <h3 style="margin-top: 0; margin-bottom: 5px;">Drinks & Extras</h3>
+            <div id="drinks-console-name" style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;"></div>
+
+            <div id="drinks-preview-box" style="background: #000; padding: 12px 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--border-color);">
+                <div class="receipt-row" id="drinks-preview-time-row" style="display: none;">
+                    <span style="color: var(--text-muted);" id="drinks-preview-time-label">Time So Far:</span>
+                    <strong id="drinks-preview-time">00:00:00</strong>
+                </div>
+                <div class="receipt-row" id="drinks-preview-time-cost-row" style="display: none;">
+                    <span style="color: var(--text-muted);" id="drinks-preview-time-cost-label">Time Cost So Far:</span>
+                    <strong id="drinks-preview-time-cost">0.00 EGP</strong>
+                </div>
+                <div class="receipt-row receipt-total" style="border: none; padding-bottom: 0;">
+                    <span id="drinks-preview-extras-label">Extras Total</span>
+                    <strong id="drinks-preview-extras-total">0.00 EGP</strong>
+                </div>
+            </div>
+
+            <div id="drinks-list" class="drinks-scroll-container"></div>
+            <h4 style="margin: 20px 0 10px 0; font-size: 15px;">Add Custom Item</h4>
+            <button class="btn-blue" onclick="openCustomItemWizard()" style="width:100%; padding:12px;">➕ Add Custom Item</button>
+            <div id="custom-items-list" style="margin-top: 15px; max-height: 150px; overflow-y: auto;"></div>
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button class="btn-success" onclick="closeDrinksModal()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         MODAL: CUSTOM ITEM WIZARD
+         Step 1 – name & price
+         Step 2 – stock components (menu items)
+         Step 3 – outside purchases
+    ══════════════════════════════════════════ -->
+    <div class="modal-overlay" id="custom-item-wizard-modal" style="display:none; z-index:1100;">
+        <div class="modal-content" style="max-height:90vh; overflow-y:auto;">
+            <h3 style="margin-top:0; color:var(--accent-cyan); margin-bottom:4px;">➕ Add Custom Item</h3>
+            <p style="color:var(--text-muted); font-size:12px; margin:0 0 16px;">Fill in details below. Selling price must cover all components.</p>
+
+            <!-- Name & price -->
+            <label style="color:var(--text-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:4px;">Item Name</label>
+            <input type="text" id="cwiz-name" placeholder="e.g. Special Combo" style="margin-bottom:12px;">
+
+            <label style="color:var(--text-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:4px;">Selling Price (EGP)</label>
+            <input type="number" id="cwiz-price" placeholder="e.g. 50" min="0" step="0.01" oninput="cwizUpdateCostBar()" style="margin-bottom:16px;">
+
+            <!-- Stock components section -->
+            <div style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:14px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-size:13px; font-weight:600; color:var(--text-main);">📦 From Our Stock (Menu Items)</span>
+                    <button onclick="cwizAddStockRow()" style="width:auto; padding:5px 12px; font-size:12px; background:transparent; border:1px dashed var(--accent-cyan); color:var(--accent-cyan); border-radius:6px;">+ Add</button>
+                </div>
+                <div id="cwiz-stock-rows" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- rows injected by JS -->
+                </div>
+                <div id="cwiz-stock-empty" style="color:var(--text-muted); font-size:12px; text-align:center; padding:6px 0;">No stock components added.</div>
+            </div>
+
+            <!-- Outside purchase section -->
+            <div style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:14px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-size:13px; font-weight:600; color:var(--text-main);">🛒 Purchased Outside (Not on Menu)</span>
+                    <button onclick="cwizAddOutsideRow()" style="width:auto; padding:5px 12px; font-size:12px; background:transparent; border:1px dashed var(--accent-purple); color:var(--accent-purple); border-radius:6px;">+ Add</button>
+                </div>
+                <div id="cwiz-outside-rows" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- rows injected by JS -->
+                </div>
+                <div id="cwiz-outside-empty" style="color:var(--text-muted); font-size:12px; text-align:center; padding:6px 0;">No outside purchases added.</div>
+            </div>
+
+            <!-- Cost bar -->
+            <div id="cwiz-cost-bar" style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:16px; font-size:13px; line-height:1.8;">
+                <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">Total component cost:</span><strong id="cwiz-comp-total" style="color:var(--warning);">0.00 EGP</strong></div>
+                <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">Selling price:</span><strong id="cwiz-sell-display" style="color:var(--accent-cyan);">0.00 EGP</strong></div>
+                <div id="cwiz-warning" style="display:none; color:var(--danger); font-size:12px; margin-top:6px; padding:6px 10px; background:var(--danger-glow); border-radius:6px;">⚠️ Selling price is lower than total component cost!</div>
+                <div id="cwiz-stock-warning" style="display:none; color:var(--danger); font-size:12px; margin-top:6px; padding:6px 10px; background:var(--danger-glow); border-radius:6px;">⚠️ Not enough stock for one or more selected items — adjust quantities or restock before adding.</div>
+            </div>
+
+            <div class="modal-actions" style="margin-top:0;">
+                <button class="btn-success" id="cwiz-confirm-btn" onclick="cwizConfirm()">✅ Add to Order</button>
+                <button style="background:transparent; border:1px solid var(--border-color); color:white;" onclick="cwizClose()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="checkout-modal">
+        <div class="modal-content">
+            <h2 style="margin-top: 0; margin-bottom: 20px; text-align: center;">Session Checkout</h2>
+            <div style="background: #000; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--border-color);">
+                <div class="receipt-row">
+                    <span style="color: var(--text-muted);">Console:</span>
+                    <strong id="chk-console">PS4 - 01</strong>
+                </div>
+                <div class="receipt-row">
+                    <span style="color: var(--text-muted);">Mode:</span>
+                    <strong id="chk-mode">Open Time</strong>
+                </div>
+                <div class="receipt-row" style="border: none; padding-bottom: 0;">
+                    <span style="color: var(--text-muted);">Total Time:</span>
+                    <strong id="chk-time">00:00:00</strong>
+                </div>
+            </div>
+            
+            <div id="chk-breakdown-container">
+                <div class="receipt-sub" id="chk-single-row">
+                    <span><span id="chk-single-label">Single</span> (<span id="chk-single-time">0m</span>)</span>
+                    <strong id="chk-single-price">0.00 EGP</strong>
+                </div>
+                <div class="receipt-sub" id="chk-multi-row">
+                    <span>Multi (<span id="chk-multi-time">0m</span>)</span>
+                    <strong id="chk-multi-price">0.00 EGP</strong>
+                </div>
+                <div class="receipt-sub" id="chk-iptv-row" style="display: none;">
+                    <span>IPTV (<span id="chk-iptv-time">0m</span>)</span>
+                    <strong id="chk-iptv-price">0.00 EGP</strong>
+                </div>
+                <div id="chk-drinks-list" style="margin-top: 10px;"></div>
+                <div class="receipt-sub" id="chk-extras-row" style="display: none; border-top: 1px dashed var(--border-color); padding-top: 8px; margin-top: 8px;">
+                    <span style="color: #fff;">Extras Total</span>
+                    <strong id="chk-extras-price" style="color: #fff;">0.00 EGP</strong>
+                </div>
+            </div>
+
+            <div class="receipt-row receipt-total">
+                <span>Amount Due</span>
+                <strong id="chk-price">0.00 EGP</strong>
+            </div>
+
+            <div style="margin-top: 15px; margin-bottom: 15px;">
+                <p style="color: var(--text-muted); font-size: 13px; margin-top: 0; margin-bottom: 5px;">Client Phone Number (Optional)</p>
+                <input type="tel" id="chk-phone-number" placeholder="Enter phone number" >
+            </div>
+            <div class="modal-actions">
+                <button class="btn-success" onclick="confirmCheckout()">Confirm Payment</button>
+                <button style="background: transparent; border: 1px solid var(--border-color); color: white;" onclick="closeCheckoutModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="edit-expense-modal" style="display: none;">
+        <div class="modal-content">
+            <h3 style="margin-top: 0; color: var(--accent-cyan); margin-bottom: 20px;">Edit Expense Entry</h3>
+            
+            <input type="hidden" id="edit-expense-id">
+            
+            <label style="color: var(--text-muted); font-size: 13px; display: block; margin-bottom: 5px;">Expense Description:</label>
+            <input type="text" id="edit-expense-desc" style="margin-bottom: 12px;">
+            
+            <label style="color: var(--text-muted); font-size: 13px; display: block; margin-bottom: 5px;">Amount (EGP):</label>
+            <input type="number" id="edit-expense-amount" style="margin-bottom: 18px;" min="0">
+            
+            <div class="modal-actions" style="margin-top: 0; display: flex; gap: 10px;">
+                <button class="btn-success" id="save-expense-btn" onclick="saveEditedExpense()" style="flex: 1;">Save Changes</button>
+                <button style="background: transparent; border: 1px solid var(--border-color); color: white; flex: 1;" onclick="document.getElementById('edit-expense-modal').style.display = 'none';">Cancel</button>
+            </div>
+        </div>
+    </div>  
+
+    <div class="modal-overlay" id="start-session-modal">
+        <div class="modal-content">
+            <h3 style="margin-top: 0; color: var(--accent-cyan); margin-bottom: 20px;">Start Console Session</h3>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 0;">Log games requested for this session (optional)</p>
+
+            <div id="start-session-specs" style="background: #000; padding: 12px 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--border-color);">
+                <div class="receipt-row">
+                    <span style="color: var(--text-muted);" id="ss-preview-console-label">Console:</span>
+                    <strong id="ss-preview-console">-</strong>
+                </div>
+                <div class="receipt-row">
+                    <span style="color: var(--text-muted);" id="ss-preview-mode-label">Mode:</span>
+                    <strong id="ss-preview-mode">-</strong>
+                </div>
+                <div class="receipt-row" style="border: none; padding-bottom: 0;">
+                    <span style="color: var(--text-muted);" id="ss-preview-rate-label">Rate:</span>
+                    <strong id="ss-preview-rate">-</strong>
+                </div>
+            </div>
+
+            <div id="start-games-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                </div>
+            
+            <button class="btn-blue" onclick="addGameInput('start-games-container', 'start-game-input')" style="margin-bottom: 15px; background: transparent; border: 1px dashed #3b82f6; color: #3b82f6;">+ Add another game</button>
+            
+            <div class="modal-actions">
+                <button class="btn-success" onclick="confirmSessionStart()">Confirm & Start</button>
+                <button style="background: transparent; border: 1px solid var(--border-color); color: white;" onclick="closeStartSessionModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add Person to Shared Space -->
+    <div class="modal-overlay" id="add-person-modal">
+        <div class="modal-content">
+            <h3 style="margin-top: 0; color: var(--accent-cyan);">Add Person</h3>
+            <p style="color: var(--text-muted); font-size: 13px;">Billing starts immediately at <span id="add-person-rate">25</span> EGP/hr.</p>
+            <input type="hidden" id="shared-target-id">
+            <input type="text" id="new-person-name" placeholder="Enter person's name (e.g. Mohammed)">
+            <div class="modal-actions">
+                <button class="btn-success" onclick="confirmAddPerson()">Start Person's Session</button>
+                <button style="background: transparent; border: 1px solid var(--border-color); color: white;" onclick="document.getElementById('add-person-modal').style.display='none'">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Individual Checkout -->
+    <div class="modal-overlay" id="checkout-person-modal">
+        <div class="modal-content">
+            <h2 style="margin-top: 0; text-align: center;">Checkout <span id="chk-person-name" style="color: var(--accent-cyan);"></span></h2>
+            <input type="hidden" id="chk-target-shared-id">
+            <input type="hidden" id="chk-target-person-id">
+            
+            <div style="background: #000; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--border-color);">
+                <div class="receipt-row">
+                    <span style="color: var(--text-muted);">Time Played:</span>
+                    <strong id="chk-person-time">00:00:00</strong>
+                </div>
+                <div class="receipt-row" style="border: none; padding-bottom: 0;">
+                    <span style="color: var(--text-muted);">Time Cost (25/hr):</span>
+                    <strong id="chk-person-time-cost">0.00 EGP</strong>
+                </div>
+            </div>
+            
+            <div id="chk-person-drinks-list"></div>
+            
+            <!-- Hidden fields kept for confirmPersonCheckout() compatibility; no longer shown -->
+            <input type="hidden" id="chk-person-custom-name" value="">
+            <input type="hidden" id="chk-person-custom-price" value="0">
+
+            <div class="receipt-row receipt-total">
+                <span>Total Due</span>
+                <strong id="chk-person-total">0.00 EGP</strong>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-success" onclick="confirmPersonCheckout()">Confirm Payment</button>
+                <button style="background: transparent; border: 1px solid var(--border-color); color: white;" onclick="document.getElementById('checkout-person-modal').style.display='none'">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Charge Employee for Stock Adjustment -->
+    <div class="modal-overlay" id="charge-emp-modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0; color:var(--accent-cyan); margin-bottom:6px;">Charge Someone?</h3>
+            <p id="charge-emp-context" style="color:var(--text-muted); font-size:13px; margin:0 0 16px;"></p>
+
+            <label style="color:var(--text-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:4px;">Employee</label>
+            <select id="charge-emp-select" style="margin-bottom:12px;" onchange="updateChargePreview()">
+                <option value="">— Select Employee —</option>
+            </select>
+
+            <label style="color:var(--text-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:4px;">Charge Mode</label>
+            <select id="charge-emp-mode" onchange="updateChargePreview()" style="margin-bottom:8px;">
+                <option value="half">50% of menu price (default)</option>
+                <option value="full">Full menu price</option>
+                <option value="free">Free (no charge)</option>
+            </select>
+
+            <div id="charge-emp-preview" style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:16px; display:none;">
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--text-muted); font-size:13px;">Deduct from salary:</span>
+                    <strong id="charge-emp-amount-display" style="color:var(--warning);">0 EGP</strong>
+                </div>
+            </div>
+
+            <div class="modal-actions" style="margin-top:0;">
+                <button class="btn-warning" onclick="confirmChargeEmployee()">✅ Confirm Charge</button>
+                <button style="background:transparent; border:1px solid var(--border-color); color:white;" onclick="document.getElementById('charge-emp-modal').style.display='none'">Skip / No Charge</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Employee -->
+    <div class="modal-overlay" id="edit-emp-modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0; color:var(--accent-cyan); margin-bottom:16px;">Edit Employee</h3>
+            <input type="hidden" id="edit-emp-id">
+            <label style="color:var(--text-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:4px;">Name</label>
+            <input type="text" id="edit-emp-name" style="margin-bottom:12px;">
+            <label style="color:var(--text-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:4px;">Monthly Salary (EGP)</label>
+            <input type="number" id="edit-emp-salary" min="0" style="margin-bottom:18px;">
+            <div class="modal-actions" style="margin-top:0; display:flex; gap:10px;">
+                <button class="btn-success" onclick="saveEditEmployee()" style="flex:1;">Save</button>
+                <button style="background:transparent; border:1px solid var(--border-color); color:white; flex:1;" onclick="document.getElementById('edit-emp-modal').style.display='none'">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         MODAL: FINALIZE MONTH (Admin Password Protected)
+    ══════════════════════════════════════════ -->
+    <div class="modal-overlay" id="finalize-month-modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0; color:var(--warning); margin-bottom:6px;">🔐 Finalize Month</h3>
+            <p style="color:var(--text-muted); font-size:13px; margin:0 0 16px;">Review the payroll summary below. Enter your admin password to confirm and process.</p>
+
+            <!-- Per-employee summary injected by JS -->
+            <div id="finalize-month-summary" style="margin-bottom:16px; font-size:13px; line-height:1.6;"></div>
+
+            <label style="color:var(--text-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:4px;">Admin Password</label>
+            <input type="password" id="finalize-admin-pw" placeholder="Enter admin password…" style="margin-bottom:6px;">
+
+            <div id="finalize-pw-error" style="display:none; font-size:12px; color:var(--danger); margin-bottom:10px; padding:8px 12px; background:var(--danger-glow); border-radius:var(--radius-sm); border:1px solid rgba(240,75,75,0.3);">
+                ❌ Incorrect password. Please try again.
+            </div>
+
+            <div class="modal-actions" style="margin-top:8px; display:flex; gap:10px;">
+                <button class="btn-warning" onclick="confirmFinalizeMonth()" style="flex:1; font-weight:700;">✅ Confirm & Finalize</button>
+                <button style="background:transparent; border:1px solid var(--border-color); color:white; flex:1;" onclick="closeFinalizeMonthModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="admin-overlay" class="sidebar-overlay" onclick="toggleAdminMenu(false)"></div>
+    <div id="adminMenu" class="admin-sidebar">
+        <div style="display: flex; justify-content: flex-end; padding: 15px 20px 0 0;">
+            <a href="javascript:void(0)" onclick="toggleAdminMenu(false)" style="font-size: 28px; color: var(--text-muted); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">×</a>
+        </div>
+
+        <h2 style="text-align: center; color: var(--accent-purple); margin-top: 5px; margin-bottom: 25px; font-weight: 600; font-size: 22px; letter-spacing: 0.5px;">System Admin</h2>
+        
+        <div class="admin-menu-list">
+            <button class="admin-menu-btn" onclick="openAuditsView(); toggleAdminMenu(false);">📊 Audits & Pricing</button>
+            <button class="admin-menu-btn" onclick="openExpensesAdminView(); toggleAdminMenu(false);">💸 Modify Expenses</button>
+            <button class="admin-menu-btn" onclick="openAdminGamesView(); toggleAdminMenu(false);">🎮 Games Asked For</button>
+            <button class="admin-menu-btn" onclick="openStockView(); toggleAdminMenu(false);" >📦 Stock Management</button>
+            <button class="admin-menu-btn" onclick="openEmployeeView(); toggleAdminMenu(false);">👥 Employees & Personal Use</button>
+            <button class="admin-menu-btn" id="admin-btn-notebook" onclick="openNotebookAdminView(); toggleAdminMenu(false);" style="position:relative;">📓 Notebook <span class="notebook-dot" id="notebook-dot-admin-menu" style="display:none; position:static; margin-left:6px;"></span></button>
+            <button class="admin-menu-btn" id="admin-btn-pending" onclick="openPendingAdminView(); toggleAdminMenu(false);" style="position:relative;">🔒 <span id="pc-menu-label-el">Pending Checkouts</span> <span class="pending-dot" id="pending-dot-admin-menu" style="display:none; position:static; margin-left:6px;"></span></button>
+
+            <div class="admin-section" style="margin-top: 15px; border-radius: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 15px; box-sizing: border-box;">
+                <h3 style="font-size: 15px; margin-top: 0; margin-bottom: 5px; color: var(--accent-purple); font-weight: 600;">💾 Data Engine</h3>
+                <p style="color: var(--text-muted); font-size: 12px; margin-top: 0; margin-bottom: 15px; white-space: normal;">Backup or restore your financial database.</p>
+                
+                <button onclick="exportDataToCSV()" class="btn-blue" style="margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; font-size: 14px; padding: 12px;">
+                    <span>⬇️</span> Export financial (CSV)
+                </button>
+                
+                <div style="background: #000; padding: 15px; border-radius: 10px; border: 1px solid var(--border-color);">
+                    <label style="color: white; font-size: 13px; font-weight: bold; margin-bottom: 8px; display: block;">Restore Data</label>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <input type="file" id="csvFileInput" accept=".csv" style="padding: 10px; margin: 0; font-size: 13px; background: var(--bg-card); border: 1px dashed rgba(255, 255, 255, 0.2); color: var(--text-main); border-radius: 8px; width: 100%; box-sizing: border-box;">
+                        <button onclick="importDataFromCSV()" class="btn-danger" style="display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; font-size: 14px; padding: 11px;">
+                            <span>⬆️</span> Import Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 40px;"></div>
+            <button class="admin-menu-btn logout-btn" onclick="logout()">🚪 Logout</button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         MODULAR JAVASCRIPT ARCHITECTURE
+         Load order matters: config → init → ui → features
+    ═══════════════════════════════════════════════════════════ -->
+
+    <!-- Foundation: must be first -->
+    <script src="js/01_config.js"></script>
+
+    <!-- Core bootstrap & data loading -->
+    <script src="js/02_init.js"></script>
+
+    <!-- UI primitives: alerts, auth, admin menu -->
+    <script src="js/03_ui_core.js"></script>
+
+    <!-- Admin sub-views: pricing, drinks menu, CSV engine -->
+    <script src="js/04_admin_views.js"></script>
+
+    <!-- Navigation: tab switching, zone switching -->
+    <script src="js/05_navigation.js"></script>
+
+    <!-- Session management: build consoles, start/stop, modes -->
+    <script src="js/06_sessions.js"></script>
+
+    <!-- Live timer loop & real-time UI updates -->
+    <script src="js/07_timer.js"></script>
+
+    <!-- Drinks & extras modal for all session types -->
+    <script src="js/08_drinks.js"></script>
+
+    <!-- Session checkout: PS / VIP / Cafe / Migration -->
+    <script src="js/09_checkout.js"></script>
+
+    <!-- Finance tracker: income, expenses, records UI -->
+    <script src="js/10_finance.js"></script>
+
+    <!-- Shared space: tables, per-person billing, checkout -->
+    <script src="js/11_shared_space.js"></script>
+
+    <!-- Stock management: levels, purchases, adjustments, CSV -->
+    <script src="js/12_stock.js"></script>
+
+    <!-- Employees, personal use, monthly payroll -->
+    <script src="js/13_employees.js"></script>
+
+    <!-- Arabic / English toggle — must load last (patches showApp & toggleAdminMenu) -->
+    <script src="js/14_language.js"></script>
+
+    <!-- Notebook: shared team notes board. Loaded AFTER 14_language.js so it
+         can call T()/Tf() directly and so its own dynamic renderers can be
+         wired into refreshDynamicContentForLanguage() via a small patch. -->
+    <script src="js/15_notebook.js"></script>
+
+    <!-- Escrow / Pending Checkout system. Loaded AFTER 15_notebook.js for the
+         same reason 15_notebook.js loads after 14_language.js: it calls
+         T()/Tf() directly and wraps buildConsoles/renderSharedSpace/
+         refreshDynamicContentForLanguage/showApp itself instead of needing a
+         14_language.js monkey-patch. -->
+    <script src="js/16_pending_checkout.js"></script>
+    <script src="supabase.js"></script>
+    <script src="js/17_sync.js"></script>
+
+    <!-- WEBSITE-ONLY: replaces main.dart's login screen + license/device-
+         limit system, which only exist in the Android app. Loaded last so
+         verifyAppCredential() (01), window.supabaseClient (17), and
+         window.initializeAuthenticatedSession() (01) all already exist. -->
+    <script src="bcrypt.js"></script>
+    <script src="js/18_web_gate.js"></script>
+</body>
+</html>
